@@ -1,36 +1,49 @@
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { LAMPORTS_PER_SOL } from '@solana/web3.js';
 import { FC, useEffect, useState } from 'react';
 
-
 export const BalanceDisplay: FC = () => {
-    const [Balance, setBalance] = useState(0);
+    const [balance, setBalance] = useState(0);
     const { connection } = useConnection();
-    const { publickey } = useWallet();
+    const { publicKey } = useWallet(); // Corrected to `publicKey`
 
     useEffect(() => {
-        if (!connection || !publickey) {
-            return 
+        if (!connection || !publicKey) {
+            return;
         }
 
-        // Ensure the balance updates after the transaction completes
-        connection.onAccountChange(
-            publickey,
+        // Fetch the initial balance
+        const fetchBalance = async () => {
+            const accountInfo = await connection.getAccountInfo(publicKey);
+            if (accountInfo) {
+                setBalance(accountInfo.lamports / LAMPORTS_PER_SOL);
+            }
+        };
+
+        fetchBalance();
+
+        // Subscribe to account changes
+        const subscriptionId = connection.onAccountChange(
+            publicKey,
             (updatedAccountInfo) => {
-                setBalance(updatedAccountInfo.lamports / LAMPORTS_PER_SOL)
+                setBalance(updatedAccountInfo.lamports / LAMPORTS_PER_SOL);
             },
-            "confirmed",
+            "confirmed"
         );
 
-        connection.getAccountInfo(publickey).then((info) => {
-            setBalance(info.lamports);
-        });
-    }, [connection, publickey]);
+        // Cleanup subscription on component unmount
+        return () => {
+            connection.removeAccountChangeListener(subscriptionId);
+        };
+    }, [connection, publicKey]);
 
     return (
-        <p>{publickey ? `Balance: ${Balance / LAMPORTS_PER_SOL} SOL`: ""}</p>
-    )
-
-}
+        <p>
+            {publicKey
+                ? `Balance: ${balance.toFixed(2)} SOL`
+                : "Connect your wallet to view balance."}
+        </p>
+    );
+};
 
 export default BalanceDisplay;
